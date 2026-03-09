@@ -23,7 +23,7 @@ pipeline {
         }
         stage('Terraform Init') {
             steps {
-                dir('terraform/e-commerce-cluster/environment/dev') {
+                dir('terraform/e-commerce-cluster/environments/dev') {
                     echo "Initializing Terraform..."
                     sh "ls"
                     sh "pwd"
@@ -34,7 +34,7 @@ pipeline {
 
         stage('Terraform Destroy Plan') {
             steps {
-                dir('terraform/e-commerce-cluster/environment/dev') {
+                dir('terraform/e-commerce-cluster/environments/dev') {
                     echo "Planning Terraform destroy..."
                     sh "terraform plan -destroy -out=tfdestroyplan"
                 }
@@ -49,7 +49,7 @@ pipeline {
 
         stage('Terraform Destroy Apply') {
             steps {
-                dir('terraform/e-commerce-cluster/environment/dev') {
+                dir('terraform/e-commerce-cluster/environments/dev') {
                     echo "Destroying Terraform infrastructure..."
                     sh "terraform apply -auto-approve tfdestroyplan"
                 }
