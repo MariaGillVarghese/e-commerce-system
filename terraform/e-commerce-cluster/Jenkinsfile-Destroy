@@ -14,7 +14,13 @@ pipeline {
                 checkout scm
             }
         }
-
+        stage('Debug Repo Path') {
+            steps {
+                echo "Printing current working directory and file tree..."
+                sh "pwd"
+                sh "ls -R"
+            }
+        }
         stage('Terraform Init') {
             steps {
                 dir('terraform/e-commerce-cluster/environment/dev') {
