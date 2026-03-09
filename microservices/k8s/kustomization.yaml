@@ -1,0 +1,46 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ecommerce
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: ecommerce-system
+
+# Resources to apply
+resources:
+  - k8s/namespace.yaml
+  - k8s/postgres-secret.yaml
+  - product-service/templates/kustomization.yaml
+  - order-service/templates/kustomization.yaml
+  - frontend-service/templates/kustomization.yaml
+
+# Common metadata
+commonAnnotations:
+  kustomize.config.k8s.io/version: v4.5.7
+  kustomize.config.k8s.io/timestamp: "2024-01-01T00:00:00Z"
+
+# Image customization
+images:
+  - name: ecommerce-product-service
+    newTag: latest
+  - name: ecommerce-order-service
+    newTag: latest
+  - name: ecommerce-frontend-service
+    newTag: latest
+
+# Replica override (can be customized)
+replicas:
+  - name: product-service
+    count: 2
+  - name: order-service
+    count: 2
+  - name: frontend-service
+    count: 2
+
+# Common labels to add
+labels:
+  - pairs:
+      version: "1.0.0"
+      managed-by: kustomize
+      environment: production

@@ -1,0 +1,157 @@
+---
+- name: Ensure OS packages are up to date
+  yum:
+    name: '*'
+    state: latest
+  tags: packages
+
+- name: Install PostgreSQL Python dependency (psycopg2)
+  dnf:
+    name: python3-psycopg2
+    state: present
+  become: yes
+  tags: database
+
+- name: Install PostgreSQL 15 and dependencies
+  yum:
+    name:
+      - postgresql15-server
+      - postgresql15
+    state: present
+  tags: packages
+
+- name: Initialize PostgreSQL database (if not yet initialized)
+  command: postgresql-setup --initdb
+  args:
+    creates: /var/lib/pgsql/data/PG_VERSION
+  tags: database
+
+- name: Start and enable PostgreSQL service
+  systemd:
+    name: postgresql
+    state: started
+    enabled: yes
+  tags: database
+
+- name: Ensure pg_hba.conf uses md5 authentication
+  lineinfile:
+    path: /var/lib/pgsql/data/pg_hba.conf
+    regexp: '^local\s+all\s+all\s+'
+    line: 'local   all             all                                     md5'
+    state: present
+    backrefs: yes
+  notify: restart postgres
+
+- name: Ensure ipv4 host line is md5
+  lineinfile:
+    path: /var/lib/pgsql/data/pg_hba.conf
+    regexp: '^host\s+all\s+all\s+127\.0\.0\.1/32\s+'
+    line: 'host    all             all             127.0.0.1/32            md5'
+    state: present
+    backrefs: yes
+  notify: restart postgres
+
+- name: Ensure ipv6 host line is md5
+  lineinfile:
+    path: /var/lib/pgsql/data/pg_hba.conf
+    regexp: '^host\s+all\s+all\s+::1/128\s+'
+    line: 'host    all             all             ::1/128                 md5'
+    state: present
+    backrefs: yes
+  notify: restart postgres
+
+# add step: sudo dnf install python3-psycopg2 -y
+- name: Create PostgreSQL role for ec2-user
+  community.postgresql.postgresql_user:
+    name: "ec2-user"
+    password: "SecurePassword123!"
+    role_attr_flags: LOGIN
+    state: present
+  become: yes
+  become_user: postgres
+  tags: database
+
+# PRIMARY CONFIGURATION
+- name: Configure PostgreSQL replication settings
+  lineinfile:
+    path: /var/lib/pgsql/data/postgresql.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - { regexp: '^#?listen_addresses', line: "listen_addresses='*'" }
+    - { regexp: '^#?wal_level', line: "wal_level=replica" }
+    - { regexp: '^#?max_wal_senders', line: "max_wal_senders=5" }
+    - { regexp: '^#?wal_keep_size', line: "wal_keep_size=128MB" }
+  when: inventory_hostname in groups['postgres_primary']
+  notify: restart postgres
+
+- name: Allow replica to connect for replication
+  lineinfile:
+    path: /var/lib/pgsql/data/pg_hba.conf
+    line: "host replication replicator {{ hostvars[groups['postgres_replica'][0]].ansible_host }}/32 md5"
+  when: inventory_hostname in groups['postgres_primary']
+  notify: restart postgres
+
+- name: Create replication user
+  community.postgresql.postgresql_user:
+    name: replicator
+    password: replica_password
+    role_attr_flags: REPLICATION,LOGIN
+  become_user: postgres
+  when: inventory_hostname in groups['postgres_primary']
+
+- name: Copy SQL directory to database server
+  copy:
+    src: /home/ec2-user/e-commerce-system/sql/
+    dest: /tmp/sql/
+    owner: postgres
+    group: postgres
+    mode: '0644'
+  tags: database
+  when: inventory_hostname in groups['postgres_primary']
+
+- name: Execute database setup script as postgres
+  community.postgresql.postgresql_db:
+    name: ecommerce
+    owner: "ec2-user"
+    state: present
+  become_user: postgres
+  tags: database
+  when: inventory_hostname in groups['postgres_primary']
+
+- name: Run SQL file against ecommerce database
+  command: psql -d ecommerce -f /tmp/sql/setup-postgresql.sql
+  become_user: postgres
+  tags: database
+  when: inventory_hostname in groups['postgres_primary']
+
+# REPLICA SETUP
+- name: Stop PostgreSQL on replica
+  systemd:
+    name: postgresql
+    state: stopped
+  when: inventory_hostname in groups['postgres_replica']
+
+- name: Remove existing data directory
+  file:
+    path: /var/lib/pgsql/data
+    state: absent
+  when: inventory_hostname in groups['postgres_replica']
+
+- name: Clone primary database
+  command: >
+    pg_basebackup -h {{ hostvars[groups['postgres_primary'][0]].ansible_host }}
+    -D /var/lib/pgsql/data
+    -U replicator
+    -P
+    -R
+  environment:
+    PGPASSWORD: replica_password
+  become_user: postgres
+  when: inventory_hostname in groups['postgres_replica']
+
+- name: Start PostgreSQL replica
+  systemd:
+    name: postgresql
+    state: started
+  when: inventory_hostname in groups['postgres_replica']

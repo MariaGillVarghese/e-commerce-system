@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-service-config
+  namespace: ecommerce
+  labels:
+    app: product-service
+data:
+  datasource.url: "jdbc:postgresql://postgres:5432/product_db"
+  hibernate.ddl-auto: "update"
+  hibernate.dialect: "org.hibernate.dialect.PostgreSQLDialect"
+  spring.jpa.show-sql: "false"
+  logging.level.root: "INFO"
+  logging.level.com.ecommerce: "DEBUG"

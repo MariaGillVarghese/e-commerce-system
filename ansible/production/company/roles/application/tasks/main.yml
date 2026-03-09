@@ -1,0 +1,217 @@
+---
+- name: Install OpenJDK and Maven
+  dnf:
+    name:
+      - java-17-amazon-corretto-devel
+      - maven
+    state: present
+  tags: build
+
+- name: Ensure project directory exists
+  file:
+    path: "{{ project_dir }}"
+    state: directory
+    owner: ec2-user
+    group: ec2-user
+    mode: '0755'
+  tags: deploy
+
+- name: Copy e-commerce microservices source tree
+  synchronize:
+    src: "{{ playbook_dir }}/../../../microservices"
+    dest: "{{ project_dir }}"
+    rsync_opts:
+      - --exclude=.git
+  delegate_to: localhost
+  tags: deploy
+
+- name: Build the Maven projects (skip tests)
+  command: mvn clean package -DskipTests
+  args:
+    chdir: "{{ project_dir }}/microservices"
+  become_user: ec2-user
+  tags: build
+
+- name: Create systemd unit for product-service
+  copy:
+    dest: /etc/systemd/system/product-service.service
+    content: |
+      [Unit]
+      Description=Product Service
+      After=network.target
+
+      [Service]
+      User=ec2-user
+      WorkingDirectory={{ project_dir }}/microservices/product-service
+      ExecStart=/usr/bin/java -jar {{ project_dir }}/microservices/product-service/target/product-service-1.0.0.jar
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+  tags: services
+
+- name: Create systemd unit for order-service
+  copy:
+    dest: /etc/systemd/system/order-service.service
+    content: |
+      [Unit]
+      Description=Order Service
+      After=network.target
+
+      [Service]
+      User=ec2-user
+      WorkingDirectory={{ project_dir }}/microservices/order-service
+      ExecStart=/usr/bin/java -jar {{ project_dir }}/microservices/order-service/target/order-service-1.0.0.jar
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+  tags: services
+
+- name: Create systemd unit for frontend-service
+  copy:
+    dest: /etc/systemd/system/frontend-service.service
+    content: |
+      [Unit]
+      Description=Frontend Service
+      After=network.target
+
+      [Service]
+      User=ec2-user
+      WorkingDirectory={{ project_dir }}/microservices/frontend-service
+      ExecStart=/usr/bin/java -jar {{ project_dir }}/microservices/frontend-service/target/frontend-service-1.0.0.war
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+  tags: services
+
+- name: Reload systemd to pick up new units
+  systemd:
+    daemon_reload: yes
+  tags: services
+
+- name: Enable services but do not start them
+  systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: stopped
+  loop:
+    - product-service
+    - order-service
+    - frontend-service
+  tags: services
+
+# --- HA / Pacemaker Setup ---
+- name: Install HA packages
+  dnf:
+    name:
+      - pacemaker
+      - pcs
+      - corosync
+      - resource-agents
+    state: present
+  become: yes
+  tags: ha
+
+- name: Enable pcsd service
+  systemd:
+    name: pcsd
+    state: started
+    enabled: yes
+  become: yes
+  tags: ha
+
+- name: Set hacluster password
+  user:
+    name: hacluster
+    password: "{{ 'clusterpass' | password_hash('sha512') }}"
+  become: yes
+  tags: ha
+
+- name: Authenticate cluster nodes
+  command: >
+    pcs host auth e-commerce-ec2-1 e-commerce-ec2-2 -u hacluster -p clusterpass
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Setup cluster (only if not exists)
+  command: pcs cluster setup ecommerce-cluster e-commerce-ec2-1 e-commerce-ec2-2
+  register: cluster_setup
+  failed_when: "'Cluster already exists' not in cluster_setup.stderr"
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Start cluster
+  command: pcs cluster start --all
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Enable cluster on boot
+  command: pcs cluster enable --all
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Set resource stickiness
+  command: pcs resource defaults resource-stickiness=100
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Disable STONITH (optional for AWS)
+  command: pcs property set stonith-enabled=false
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Create internal VIP resource (private IP)
+  command: pcs resource create ecommerce-vip ocf:heartbeat:IPaddr2 ip=10.0.1.100 cidr_netmask=24 op monitor interval=30s
+  register: vip_res
+  failed_when: "'already exists' not in vip_res.stderr"
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+# Optional AWS Elastic IP failover
+- name: Reassociate Elastic IP on failover
+  command: aws ec2 associate-address --instance-id {{ hostvars[inventory_hostname]['ansible_ec2_instance_id'] }} --allocation-id <EIP_ALLOCATION_ID>
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+# Systemd services managed by Pacemaker
+- name: Add product-service resource
+  command: pcs resource create product-service systemd:product-service
+  register: prod_res
+  failed_when: "'already exists' not in prod_res.stderr"
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Add order-service resource
+  command: pcs resource create order-service systemd:order-service
+  register: order_res
+  failed_when: "'already exists' not in order_res.stderr"
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Add frontend-service resource
+  command: pcs resource create frontend-service systemd:frontend-service
+  register: fe_res
+  failed_when: "'already exists' not in fe_res.stderr"
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Create Pacemaker resource group for e-commerce services
+  command: pcs resource group add ecommerce-group ecommerce-vip product-service order-service frontend-service
+  register: group_res
+  failed_when: "'already exists' not in group_res.stderr"
+  become: yes
+  when: inventory_hostname == groups['postgres_primary'][0]
+  tags: ha
