@@ -19,6 +19,8 @@ pipeline {
             steps {
                 dir('terraform/e-commerce-cluster/environment/dev') {
                     echo "Initializing Terraform..."
+                    sh "ls"
+                    sh "pwd"
                     sh "terraform init"
                 }
             }
