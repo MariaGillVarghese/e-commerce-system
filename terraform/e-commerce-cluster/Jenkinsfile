@@ -19,7 +19,7 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                dir('terraform/e-commerce-cluster/environment/dev') {
+                dir('terraform/e-commerce-cluster/environments/dev') {
                     echo "Initializing Terraform..."
                     sh "ls"
                     sh "pwd"
@@ -30,7 +30,7 @@ pipeline {
 
         stage('Terraform Plan') {
             steps {
-                dir('terraform/e-commerce-cluster/environment/dev') {
+                dir('terraform/e-commerce-cluster/environments/dev') {
                     echo "Running Terraform plan..."
                     sh "terraform plan -out=tfplan"
                 }
@@ -39,7 +39,7 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                dir('terraform/e-commerce-cluster/environment/dev') {
+                dir('terraform/e-commerce-cluster/environments/dev') {
                     echo "Applying Terraform changes..."
                     sh "terraform apply -auto-approve tfplan"
                 }
