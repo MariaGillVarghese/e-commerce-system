@@ -1,0 +1,60 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo "Checking out code from GitHub..."
+                checkout scm
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                dir('terraform/e-commerce-cluster/environment/dev') {
+                    echo "Initializing Terraform..."
+                    sh "terraform init"
+                }
+            }
+        }
+
+        stage('Terraform Destroy Plan') {
+            steps {
+                dir('terraform/e-commerce-cluster/environment/dev') {
+                    echo "Planning Terraform destroy..."
+                    sh "terraform plan -destroy -out=tfdestroyplan"
+                }
+            }
+        }
+
+        stage('Approval') {
+            steps {
+                input message: "Do you really want to destroy the infrastructure?", ok: "Destroy"
+            }
+        }
+
+        stage('Terraform Destroy Apply') {
+            steps {
+                dir('terraform/e-commerce-cluster/environment/dev') {
+                    echo "Destroying Terraform infrastructure..."
+                    sh "terraform apply -auto-approve tfdestroyplan"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Terraform infrastructure destroyed successfully!"
+        }
+        failure {
+            echo "Terraform destroy failed!"
+        }
+    }
+}
