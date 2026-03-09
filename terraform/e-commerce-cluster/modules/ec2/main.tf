@@ -1,6 +1,6 @@
 resource "aws_key_pair" "jenkins" {
   key_name   = "jenkins-key"
-  public_key = file("~/.ssh/id_rsa.pub")  # Path to public key on Jenkins server
+  public_key = file("jenkins_id_rsa.pub")  # relative to Terraform working directory
 }
 
 resource "aws_instance" "this" {
