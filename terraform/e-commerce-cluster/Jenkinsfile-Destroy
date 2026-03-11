@@ -41,12 +41,6 @@ pipeline {
             }
         }
 
-        stage('Approval') {
-            steps {
-                input message: "Do you really want to destroy the infrastructure?", ok: "Destroy"
-            }
-        }
-
         stage('Terraform Destroy Apply') {
             steps {
                 dir('terraform/e-commerce-cluster/environments/dev') {
