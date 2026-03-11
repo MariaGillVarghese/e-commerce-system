@@ -1,6 +1,5 @@
 # Create multiple EC2s
 resource "aws_instance" "this" {
-  count           = 2  # example: two instances
   ami             = var.ami_id
   instance_type   = var.instance_type
   subnet_id       = var.subnet_id
