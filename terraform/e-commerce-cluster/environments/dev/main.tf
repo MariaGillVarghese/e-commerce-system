@@ -2,6 +2,11 @@ provider "aws" {
   region = var.aws_region
 }
 
+resource "aws_key_pair" "jenkins" {
+  key_name   = "jenkins-key"
+  public_key = file("jenkins_id_rsa.pub")
+}
+
 # Data block to get the existing VPC
 data "aws_vpc" "ecommerce_vpc" {
   filter {
