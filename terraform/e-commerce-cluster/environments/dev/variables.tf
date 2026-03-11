@@ -2,6 +2,9 @@ variable "aws_region" { type = string }
 
 variable "vpc_name" { type = string }
 
+variable "sg_name" { type = string }
+
+variable "subnet_cidr_2" { type = string }
 
 variable "ssh_key_name" {
   type = string
