@@ -60,5 +60,5 @@ module "ec2" {
   vpc_id            = data.aws_vpc.ecommerce_vpc.id 
   subnet_id        = local.first_subnet_id
   security_group_id = data.aws_security_group.ecommerce_sg.id
-  key_name          = "maria_keypair"
+  key_name = aws_key_pair.jenkins.key_name
 }
