@@ -10,11 +10,11 @@ variable "ec2_instances" {
   default = {
     ec2-1 = {
       name = "e-commerce-dev-ec2-1"
-      type = "t3.micro"
+      type = "t3.small"
     }
     ec2-2 = {
       name = "e-commerce-dev-ec2-2"
-      type = "t3.micro"
+      type = "t3.small"
     }
   
   }
