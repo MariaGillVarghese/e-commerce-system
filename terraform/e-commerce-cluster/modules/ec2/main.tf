@@ -9,6 +9,6 @@ resource "aws_instance" "this" {
   key_name = var.key_name
 
   tags = {
-    Name = "${var.instance_name}-${count.index + 1}"
+    Name = "${var.instance_name}"
   }
 }
