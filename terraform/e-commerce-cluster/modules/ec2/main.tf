@@ -1,9 +1,3 @@
-# Create the key once
-resource "aws_key_pair" "jenkins" {
-  key_name   = "jenkins-key"
-  public_key = file("jenkins_id_rsa.pub")
-}
-
 # Create multiple EC2s
 resource "aws_instance" "this" {
   count           = 2  # example: two instances
