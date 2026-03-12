@@ -45,6 +45,23 @@ pipeline {
                 }
             }
         }
+
+        stage('Show Terraform Outputs') {
+            steps {
+                dir('terraform/e-commerce-cluster/environments/dev') {
+                    echo "Printing Terraform outputs..."
+                    sh "terraform output"
+                }
+            }
+        }
+
+        stage('Show Private IPs') {
+            steps {
+                dir('terraform/e-commerce-cluster/environments/dev') {
+                    sh "terraform output private_ips"
+                }
+            }
+        }
     }
 
     post {
