@@ -9,6 +9,8 @@ CREATE DATABASE order_db;
 CREATE USER ecommerce_user WITH PASSWORD 'SecurePassword123!';
 GRANT ALL PRIVILEGES ON DATABASE product_db TO ecommerce_user;
 GRANT ALL PRIVILEGES ON DATABASE order_db TO ecommerce_user;
+GRANT ALL ON SCHEMA public TO ecommerce_user;
+ALTER SCHEMA public OWNER TO ecommerce_user;
 
 -- Connect to product_db and run the schema
 \c product_db
