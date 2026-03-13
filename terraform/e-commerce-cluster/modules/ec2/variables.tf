@@ -34,6 +34,21 @@ variable "project_name" {
   default     = "ecommerce-ha"
 }
 
+variable "private_key_content" {
+  description = "Private key content from Jenkins credential"
+  type        = string
+}
+
+variable "public_key_content" {
+  description = "Public key content from Jenkins credential"
+  type        = string
+}
+
+variable "key_name" {
+  description = "AWS key pair name"
+  type        = string
+}
+
 variable "private_key_file" {
   description = "Path to the private key file for SSH connections"
   type        = string
