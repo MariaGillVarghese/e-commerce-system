@@ -114,4 +114,4 @@ resource "aws_instance" "ecommerce_node2" {
     Project = var.project_name
     Role    = "ecommerce-cluster"
   }
-}}
+}
