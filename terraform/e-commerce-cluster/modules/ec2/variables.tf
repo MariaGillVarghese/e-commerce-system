@@ -33,3 +33,13 @@ variable "project_name" {
   type        = string
   default     = "ecommerce-ha"
 }
+
+variable "private_key_file" {
+  description = "Path to the private key file for SSH connections"
+  type        = string
+}
+
+variable "public_key_file" {
+  description = "Path to the public key file for SSH connections"
+  type        = string
+}
