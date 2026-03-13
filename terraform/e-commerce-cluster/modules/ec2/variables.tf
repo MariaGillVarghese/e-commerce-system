@@ -11,7 +11,7 @@ variable "instance_type" {
 }
 
 variable "key_name" {
-  description = "Name of the SSH key pair"
+  description = "AWS key pair name"
   type        = string
   default     = "e-commerce-key-pair"
 }
@@ -42,21 +42,4 @@ variable "private_key_content" {
 variable "public_key_content" {
   description = "Public key content from Jenkins credential"
   type        = string
-}
-
-variable "key_name" {
-  description = "AWS key pair name"
-  type        = string
-}
-
-variable "private_key_file" {
-  description = "Path to the private key file for SSH connections"
-  type        = string
-  default     = "/home/ec2-user/.ssh/id_rsa"
-}
-
-variable "public_key_file" {
-  description = "Path to the public key file for SSH connections"
-  type        = string
-  default     = "/home/ec2-user/.ssh/id_rsa.pub"
 }
