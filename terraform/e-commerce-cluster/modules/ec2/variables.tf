@@ -37,9 +37,11 @@ variable "project_name" {
 variable "private_key_file" {
   description = "Path to the private key file for SSH connections"
   type        = string
+  default     = "/home/ec2-user/.ssh/id_rsa"
 }
 
 variable "public_key_file" {
   description = "Path to the public key file for SSH connections"
   type        = string
+  default     = "/home/ec2-user/.ssh/id_rsa.pub"
 }
