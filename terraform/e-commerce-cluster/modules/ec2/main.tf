@@ -65,12 +65,12 @@ resource "aws_instance" "ecommerce_node1" {
       type        = "ssh"
       host        = self.public_ip
       user        = "ec2-user"
-      private_key = file("/home/ec2-user/.ssh/id_rsa")  # Jenkins private key on Jenkins server
+      private_key = file(var.private_key_file)
     }
 
     inline = [
       "mkdir -p /home/ec2-user/.ssh",
-      "echo '${file("/home/ec2-user/.ssh/id_rsa.pub")}' >> /home/ec2-user/.ssh/authorized_keys",
+      "echo '${file(var.public_key_file)}' >> /home/ec2-user/.ssh/authorized_keys",
       "chown -R ec2-user:ec2-user /home/ec2-user/.ssh",
       "chmod 700 /home/ec2-user/.ssh",
       "chmod 600 /home/ec2-user/.ssh/authorized_keys"
@@ -97,12 +97,12 @@ resource "aws_instance" "ecommerce_node2" {
       type        = "ssh"
       host        = self.public_ip
       user        = "ec2-user"
-      private_key = file("/home/ec2-user/.ssh/id_rsa")
+      private_key = file(var.private_key_file)
     }
 
     inline = [
       "mkdir -p /home/ec2-user/.ssh",
-      "echo '${file("/home/ec2-user/.ssh/id_rsa.pub")}' >> /home/ec2-user/.ssh/authorized_keys",
+      "echo '${file(var.public_key_file)}' >> /home/ec2-user/.ssh/authorized_keys",
       "chown -R ec2-user:ec2-user /home/ec2-user/.ssh",
       "chmod 700 /home/ec2-user/.ssh",
       "chmod 600 /home/ec2-user/.ssh/authorized_keys"
@@ -114,4 +114,4 @@ resource "aws_instance" "ecommerce_node2" {
     Project = var.project_name
     Role    = "ecommerce-cluster"
   }
-}
+}}
