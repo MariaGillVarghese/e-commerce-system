@@ -52,17 +52,30 @@ data "terraform_remote_state" "vpc" {
   }
 }
 
-# ------------------------------
-# Ecommerce Node 1
-# ------------------------------
 resource "aws_instance" "ecommerce_node1" {
   ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = var.instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.vpc.outputs.public_subnet_id
   vpc_security_group_ids = [aws_security_group.ecommerce.id]
-
   associate_public_ip_address = true
+
+  provisioner "remote-exec" {
+    connection {
+      type        = "ssh"
+      host        = self.public_ip
+      user        = "ec2-user"
+      private_key = file("/home/ec2-user/.ssh/id_rsa")  # Jenkins private key on Jenkins server
+    }
+
+    inline = [
+      "mkdir -p /home/ec2-user/.ssh",
+      "echo '${file("/home/ec2-user/.ssh/id_rsa.pub")}' >> /home/ec2-user/.ssh/authorized_keys",
+      "chown -R ec2-user:ec2-user /home/ec2-user/.ssh",
+      "chmod 700 /home/ec2-user/.ssh",
+      "chmod 600 /home/ec2-user/.ssh/authorized_keys"
+    ]
+  }
 
   tags = {
     Name    = "ecommerce-node1"
@@ -71,17 +84,30 @@ resource "aws_instance" "ecommerce_node1" {
   }
 }
 
-# ------------------------------
-# Ecommerce Node 2
-# ------------------------------
 resource "aws_instance" "ecommerce_node2" {
   ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = var.instance_type
   key_name               = var.key_name
   subnet_id              = data.terraform_remote_state.vpc.outputs.public_subnet_id
   vpc_security_group_ids = [aws_security_group.ecommerce.id]
-
   associate_public_ip_address = true
+
+  provisioner "remote-exec" {
+    connection {
+      type        = "ssh"
+      host        = self.public_ip
+      user        = "ec2-user"
+      private_key = file("/home/ec2-user/.ssh/id_rsa")
+    }
+
+    inline = [
+      "mkdir -p /home/ec2-user/.ssh",
+      "echo '${file("/home/ec2-user/.ssh/id_rsa.pub")}' >> /home/ec2-user/.ssh/authorized_keys",
+      "chown -R ec2-user:ec2-user /home/ec2-user/.ssh",
+      "chmod 700 /home/ec2-user/.ssh",
+      "chmod 600 /home/ec2-user/.ssh/authorized_keys"
+    ]
+  }
 
   tags = {
     Name    = "ecommerce-node2"
