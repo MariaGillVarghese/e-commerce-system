@@ -98,7 +98,7 @@ resource "aws_security_group" "ecommerce" {
   ingress {
     description = "Internal cluster communication"
     from_port   = 0
-    to_port     = 65535
+    to_port     = 0
     protocol    = "-1"
     self        = true
   }
