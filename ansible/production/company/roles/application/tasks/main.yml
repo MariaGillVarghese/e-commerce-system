@@ -4,6 +4,7 @@
     name:
       - java-17-amazon-corretto-devel
       - maven
+      - rsync
     state: present
   tags: build
 
@@ -22,7 +23,6 @@
     dest: "{{ project_dir }}"
     rsync_opts:
       - --exclude=.git
-  delegate_to: localhost
   tags: deploy
 
 - name: Build the Maven projects (skip tests)
@@ -102,6 +102,31 @@
     - frontend-service
   tags: services
 
+- name: Set hostname for primary node
+  hostname:
+    name: e-commerce-ec2-1
+  when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Set hostname for replica node
+  hostname:
+    name: e-commerce-ec2-2
+  when: inventory_hostname == groups['postgres_replica'][0]
+  become: yes
+  tags: ha
+  
+- name: Ensure cluster hosts are in /etc/hosts
+  become: yes
+  blockinfile:
+    path: /etc/hosts
+    block: |
+      {% for node in cluster_hosts %}
+      {{ node.ip }} {{ node.host }}
+      {% endfor %}
+    create: yes
+    marker: "# {mark} ANSIBLE CLUSTER HOSTS"
+
 # --- HA / Pacemaker Setup ---
 - name: Install HA packages
   dnf:
@@ -137,10 +162,15 @@
   tags: ha
 
 - name: Setup cluster (only if not exists)
-  command: pcs cluster setup ecommerce-cluster e-commerce-ec2-1 e-commerce-ec2-2
+  command: pcs cluster setup ecommerce-cluster e-commerce-ec2-1 e-commerce-ec2-2 --force
   register: cluster_setup
-  failed_when: "'Cluster already exists' not in cluster_setup.stderr"
+  failed_when: cluster_setup.rc != 0 and "'Cluster already exists' not in cluster_setup.stderr"
   when: inventory_hostname == groups['postgres_primary'][0]
+  become: yes
+  tags: ha
+
+- name: Authenticate to local pcsd
+  command: pcs client local-auth -u hacluster -p clusterpass
   become: yes
   tags: ha
 
@@ -157,7 +187,7 @@
   tags: ha
 
 - name: Set resource stickiness
-  command: pcs resource defaults resource-stickiness=100
+  command: pcs resource defaults update resource-stickiness=100
   when: inventory_hostname == groups['postgres_primary'][0]
   become: yes
   tags: ha
@@ -168,50 +198,82 @@
   become: yes
   tags: ha
 
-- name: Create internal VIP resource (private IP)
-  command: pcs resource create ecommerce-vip ocf:heartbeat:IPaddr2 ip=10.0.1.100 cidr_netmask=24 op monitor interval=30s
-  register: vip_res
-  failed_when: "'already exists' not in vip_res.stderr"
-  when: inventory_hostname == groups['postgres_primary'][0]
-  become: yes
-  tags: ha
-
-# Optional AWS Elastic IP failover
-- name: Reassociate Elastic IP on failover
-  command: aws ec2 associate-address --instance-id {{ hostvars[inventory_hostname]['ansible_ec2_instance_id'] }} --allocation-id <EIP_ALLOCATION_ID>
-  when: inventory_hostname == groups['postgres_primary'][0]
-  become: yes
-  tags: ha
-
 # Systemd services managed by Pacemaker
-- name: Add product-service resource
+- name: Add product-service resource (ignore if exists)
   command: pcs resource create product-service systemd:product-service
-  register: prod_res
-  failed_when: "'already exists' not in prod_res.stderr"
-  when: inventory_hostname == groups['postgres_primary'][0]
   become: yes
+  ignore_errors: yes
   tags: ha
 
-- name: Add order-service resource
+- name: Add order-service resource (ignore if exists)
   command: pcs resource create order-service systemd:order-service
-  register: order_res
-  failed_when: "'already exists' not in order_res.stderr"
-  when: inventory_hostname == groups['postgres_primary'][0]
   become: yes
+  ignore_errors: yes
   tags: ha
 
-- name: Add frontend-service resource
+- name: Add frontend-service resource (ignore if exists)
   command: pcs resource create frontend-service systemd:frontend-service
-  register: fe_res
-  failed_when: "'already exists' not in fe_res.stderr"
-  when: inventory_hostname == groups['postgres_primary'][0]
   become: yes
+  ignore_errors: yes
   tags: ha
 
 - name: Create Pacemaker resource group for e-commerce services
-  command: pcs resource group add ecommerce-group ecommerce-vip product-service order-service frontend-service
-  register: group_res
-  failed_when: "'already exists' not in group_res.stderr"
+  command: pcs resource group add ecommerce-group product-service order-service frontend-service
   become: yes
-  when: inventory_hostname == groups['postgres_primary'][0]
-  tags: ha
+  ignore_errors: yes
+
+- name: Restart product service to pick up DB permissions
+  systemd:
+    name: product-service
+    state: restarted
+  become: yes
+  tags: services
+
+- name: Restart order service to pick up DB permissions
+  systemd:
+    name: order-service
+    state: restarted
+  become: yes
+  tags: services
+
+- name: Grant privileges to ecommerce_user
+  community.postgresql.postgresql_privs:
+    db: "{{ item.db }}"
+    role: ecommerce_user
+    objs: ALL_IN_SCHEMA
+    type: table
+    privs: ALL
+    schema: public
+    state: present
+  become_user: postgres
+  loop:
+    - { db: product_db }
+    - { db: order_db }
+  tags: database
+
+- name: Set ownership of public schema to ecommerce_user
+  community.postgresql.postgresql_schema:
+    name: public
+    db: "{{ item }}"
+    owner: ecommerce_user
+    state: present
+  become_user: postgres
+  loop:
+    - product_db
+    - order_db
+  tags: database
+
+- name: Grant privileges on sequences to ecommerce_user
+  community.postgresql.postgresql_privs:
+    db: "{{ item }}"
+    role: ecommerce_user
+    type: sequence
+    objs: ALL_IN_SCHEMA
+    schema: public
+    privs: USAGE,SELECT
+    state: present
+  become_user: postgres
+  loop:
+    - product_db
+    - order_db
+  tags: database

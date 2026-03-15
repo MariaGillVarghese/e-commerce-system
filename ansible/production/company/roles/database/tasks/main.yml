@@ -5,6 +5,16 @@
     state: latest
   tags: packages
 
+- name: Set Ansible temp directory permissions workaround
+  set_fact:
+    ansible_become_flags: "-H -S -n"
+
+- name: Install ACL package for unprivileged become
+  yum:
+    name: acl
+    state: present
+  become: yes
+
 - name: Install PostgreSQL Python dependency (psycopg2)
   dnf:
     name: python3-psycopg2
@@ -33,6 +43,15 @@
     enabled: yes
   tags: database
 
+- name: Ensure postgres local peer authentication exists
+  lineinfile:
+    path: /var/lib/pgsql/data/pg_hba.conf
+    regexp: '^local\s+all\s+postgres\s+'
+    line: 'local   all             postgres                                peer'
+    state: present
+    insertafter: '^# TYPE'
+  notify: restart postgres
+
 - name: Ensure pg_hba.conf uses md5 authentication
   lineinfile:
     path: /var/lib/pgsql/data/pg_hba.conf
@@ -60,7 +79,14 @@
     backrefs: yes
   notify: restart postgres
 
-# add step: sudo dnf install python3-psycopg2 -y
+- name: Allow replica to connect for replication
+  lineinfile:
+    path: /var/lib/pgsql/data/pg_hba.conf
+    line: "host replication replicator {{ cluster_hosts[1].ip }}/32 md5"
+    state: present
+  when: inventory_hostname in groups['postgres_primary']
+  notify: restart postgres
+
 - name: Create PostgreSQL role for ec2-user
   community.postgresql.postgresql_user:
     name: "ec2-user"
@@ -68,6 +94,7 @@
     role_attr_flags: LOGIN
     state: present
   become: yes
+  become_method: sudo
   become_user: postgres
   tags: database
 
@@ -138,9 +165,17 @@
     state: absent
   when: inventory_hostname in groups['postgres_replica']
 
+- name: Ensure PostgreSQL is restarted after config changes
+  systemd:
+    name: postgresql
+    state: restarted
+  become: yes
+  tags: database
+  when: inventory_hostname in groups['postgres_primary']
+
 - name: Clone primary database
   command: >
-    pg_basebackup -h {{ hostvars[groups['postgres_primary'][0]].ansible_host }}
+    pg_basebackup -h {{ cluster_hosts[0].ip }}
     -D /var/lib/pgsql/data
     -U replicator
     -P
@@ -155,3 +190,26 @@
     name: postgresql
     state: started
   when: inventory_hostname in groups['postgres_replica']
+
+
+- name: Grant privileges to application user on product_db tables
+  community.postgresql.postgresql_privs:
+    db: product_db
+    type: table
+    privs: ALL
+    objs: ALL_IN_SCHEMA
+    schema: public
+    role: ecommerce_user
+  become_user: postgres
+  tags: database
+
+- name: Grant privileges to application user on order_db tables
+  community.postgresql.postgresql_privs:
+    db: order_db
+    type: table
+    privs: ALL
+    objs: ALL_IN_SCHEMA
+    schema: public
+    role: ecommerce_user
+  become_user: postgres
+  tags: database
