@@ -21,6 +21,11 @@ provider "aws" {
   region = var.aws_region
 }
 
+resource "aws_key_pair" "jenkins" {
+  key_name   = "jenkins-key"
+  public_key = file("../id_ed25519.pub")
+}
+
 # ------------------------------
 # Get latest Amazon Linux 2023 AMI
 # ------------------------------
@@ -52,17 +57,15 @@ data "terraform_remote_state" "vpc" {
   }
 }
 
-resource "aws_key_pair" "jenkins_key" {
-  key_name   = var.key_name
-  public_key = var.public_key_content
-}
-
+# ------------------------------
+# Ecommerce Node 1
+# ------------------------------
 resource "aws_instance" "ecommerce_node1" {
   ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = var.instance_type
-  key_name               = aws_key_pair.jenkins_key.key_name
   subnet_id              = data.terraform_remote_state.vpc.outputs.public_subnet_id
   vpc_security_group_ids = [aws_security_group.ecommerce.id]
+  key_name = aws_key_pair.jenkins.key_name
   associate_public_ip_address = true
 
   tags = {
@@ -72,12 +75,15 @@ resource "aws_instance" "ecommerce_node1" {
   }
 }
 
+# ------------------------------
+# Ecommerce Node 2
+# ------------------------------
 resource "aws_instance" "ecommerce_node2" {
   ami                    = data.aws_ami.amazon_linux_2023.id
   instance_type          = var.instance_type
-  key_name               = aws_key_pair.jenkins_key.key_name
   subnet_id              = data.terraform_remote_state.vpc.outputs.public_subnet_id
   vpc_security_group_ids = [aws_security_group.ecommerce.id]
+  key_name = aws_key_pair.jenkins.key_name
   associate_public_ip_address = true
 
   tags = {

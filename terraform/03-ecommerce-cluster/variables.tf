@@ -11,7 +11,7 @@ variable "instance_type" {
 }
 
 variable "key_name" {
-  description = "AWS key pair name"
+  description = "Name of the SSH key pair"
   type        = string
   default     = "e-commerce-key-pair"
 }
@@ -32,14 +32,4 @@ variable "project_name" {
   description = "Project name used for tagging"
   type        = string
   default     = "ecommerce-ha"
-}
-
-variable "private_key_content" {
-  description = "Private key content from Jenkins credential"
-  type        = string
-}
-
-variable "public_key_content" {
-  description = "Public key content from Jenkins credential"
-  type        = string
 }
