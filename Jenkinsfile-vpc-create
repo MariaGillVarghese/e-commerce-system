@@ -1,0 +1,88 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "Checking out code from GitHub..."
+                checkout scm
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                dir('terraform/01-vpc') {
+                    echo "Initializing Terraform..."
+                    sh "terraform init"
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                dir('terraform/01-vpc') {
+                    echo "Running Terraform plan..."
+                    withCredentials([
+                        string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
+                        string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                    ]) {
+                        sh """
+                            terraform plan -out=tfplan \
+                            -var "public_key_content=${PUBLIC_KEY}" \
+                            -var "private_key_content=${PRIVATE_KEY}"
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                dir('terraform/01-vpc') {
+                    echo "Applying Terraform changes..."
+                    withCredentials([
+                        string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
+                        string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                    ]) {
+                        sh """
+                            terraform apply -auto-approve tfplan \
+                            -var "public_key_content=${PUBLIC_KEY}" \
+                            -var "private_key_content=${PRIVATE_KEY}"
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Show Terraform Outputs') {
+            steps {
+                dir('terraform/01-vpc') {
+                    echo "Printing Terraform outputs..."
+                    sh "terraform output"
+                }
+            }
+        }
+
+        stage('Show Private IPs') {
+            steps {
+                dir('terraform/01-vpc') {
+                    sh "terraform output private_ips"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Terraform applied successfully!"
+        }
+        failure {
+            echo "Terraform run failed!"
+        }
+    }
+}

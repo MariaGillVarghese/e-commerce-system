@@ -1,0 +1,38 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo "Checking out code from GitHub..."
+                checkout scm
+            }
+        }
+
+        stage('Terraform Plan') {
+            steps {
+                dir('ansible/') {
+                    echo "Running Terraform plan..."
+                    sh """
+                        ansible-playbook -i production/company/inventory.ini production/company/playbook.yml
+                    """
+                    
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "DB and E-Commerce-System deployed successfully!"
+        }
+        failure {
+            echo "Deployed failed!"
+        }
+    }
+}
