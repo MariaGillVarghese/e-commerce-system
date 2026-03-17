@@ -52,14 +52,14 @@ docker exec jenkins-build sh -c "
                     string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
                 ]) {
                     sh '''
-        docker exec \
-          -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-          -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-          jenkins-build sh -c "
-              cd terraform/01-vpc &&
-              terraform init
-          "
-    '''
+                        docker exec \
+                        -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        jenkins-build sh -c "
+                            cd terraform/01-vpc &&
+                            terraform init
+                        "
+                    '''
                 }
             }
         }
@@ -109,12 +109,20 @@ docker exec jenkins-build sh -c "
 
         stage('Show Terraform Outputs') {
             steps {
-                sh '''
-                    docker exec jenkins-build sh -c "
-                        cd terraform/01-vpc &&
-                        terraform output
-                    "
-                '''
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    sh """
+                        docker exec \
+                        -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        jenkins-build sh -c '
+                            cd terraform/01-vpc &&
+                            terraform output
+                        '
+                    """
+                }
             }
         }
 
