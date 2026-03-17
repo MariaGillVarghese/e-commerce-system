@@ -18,29 +18,67 @@ pipeline {
             }
         }
 
-        stage('Terraform Plan') {
+        stage('Start Ansible Container') {
+            steps {
+                echo "Starting temporary container for Ansible..."
+                sh '''
+                    docker rm -f ansible-build || true
+                    docker run -d --name ansible-build \
+                        -v $PWD:/workspace \
+                        -v $HOME/.ssh:/root/.ssh:ro \
+                        -w /workspace \
+                        ubuntu:22.04 tail -f /dev/null
+                '''
+            }
+        }
+
+        stage('Install Ansible & Dependencies') {
+            steps {
+                sh '''
+                    docker exec ansible-build sh -c "
+                        apt-get update && \
+                        DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip sshpass git && \
+                        pip3 install --upgrade pip && \
+                        pip3 install ansible
+                    "
+                '''
+            }
+        }
+
+        stage('Run Ansible Playbook') {
             steps {
                 dir('ansible/') {
-                    echo "Running Terraform plan..."
-                    sh """
-                        ansible-playbook -i production/company/inventory.ini production/company/playbook.yml
-                    """
-                    
+                    echo "Running Ansible playbook..."
+                    sh '''
+                        docker exec ansible-build sh -c "
+                            ansible-playbook -i production/company/inventory.ini production/company/playbook.yml
+                        "
+                    '''
                 }
+            }
+        }
+
+        stage('Cleanup Container') {
+            steps {
+                echo "Stopping and removing temporary container..."
+                sh '''
+                    docker stop ansible-build
+                    docker rm ansible-build
+                '''
             }
         }
     }
 
     post {
+        always {
+            echo "Cleaning up workspace..."
+            cleanWs()
+        }
         success {
             echo "DB and E-Commerce-System deployed successfully!"
         }
         failure {
-            echo "Deployed failed!"
-        }
-        always {
-            echo "Cleaning up workspace..."
-            cleanWs()
+            echo "Deployment failed!"
         }
     }
 }
