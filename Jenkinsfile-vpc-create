@@ -101,6 +101,8 @@ pipeline {
     post {
         always {
             cleanWs()
+            docker stop jenkins-build
+            docker rm jenkins-build
         }
         success {
             echo "Terraform applied successfully!"
