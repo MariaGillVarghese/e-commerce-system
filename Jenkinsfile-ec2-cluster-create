@@ -5,12 +5,37 @@ pipeline {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
     }
-    
-    options {
-        skipDefaultCheckout()
-    }
 
     stages {
+        stage('Start Alpine Container') {
+            steps {
+                echo "Starting temporary Alpine container..."
+                // Run container in detached mode and mount workspace
+                sh '''
+                    docker rm -f jenkins-build || true
+                    docker run -d --name jenkins-build \
+                        -v $PWD:/workspace \
+                        -w /workspace \
+                        alpine:3.19 tail -f /dev/null
+                '''
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                docker exec jenkins-build sh -c "
+                    apk add --no-cache git bash curl unzip &&
+                    cd /tmp &&
+                    curl -LO https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip &&
+                    unzip -o terraform_1.6.6_linux_amd64.zip &&
+                    mv terraform /usr/local/bin/ &&
+                    terraform version
+                "
+                '''
+            }
+        }
+
         stage('Checkout') {
             steps {
                 echo "Checking out code from GitHub..."
@@ -20,77 +45,113 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                dir('terraform/03-ecommerce-cluster') {
-                    echo "Initializing Terraform..."
-                    sh "terraform init"
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                ]) {
+                    sh '''
+                        docker exec \
+                        -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        jenkins-build sh -c "
+                            cd terraform/03-ecommerce-cluster &&
+                            terraform init \
+                                -var 'public_key_content=${PUBLIC_KEY}' \
+                                -var 'private_key_content=${PRIVATE_KEY}'
+                        "
+                    '''
                 }
             }
         }
 
+        
         stage('Terraform Plan') {
             steps {
-                dir('terraform/03-ecommerce-cluster') {
-                    echo "Running Terraform plan..."
-                    withCredentials([
-                        string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
-                        string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
-                    ]) {
-                        sh """
-                            terraform plan -out=tfplan \
-                            -var "public_key_content=${PUBLIC_KEY}" \
-                            -var "private_key_content=${PRIVATE_KEY}"
-                        """
-                    }
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                ]) {
+                    sh '''
+                        docker exec  \
+                            -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                            -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                            jenkins-build sh -c "
+                                cd terraform/03-ecommerce-cluster &&
+                                terraform plan -out=tfplan \
+                                    -var 'public_key_content=${PUBLIC_KEY}' \
+                                    -var 'private_key_content=${PRIVATE_KEY}'
+                            "
+                    '''
                 }
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                dir('terraform/03-ecommerce-cluster') {
-                    echo "Applying Terraform changes..."
-                    withCredentials([
-                        string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
-                        string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
-                    ]) {
-                        sh """
-                            terraform apply -auto-approve tfplan \
-                            -var "public_key_content=${PUBLIC_KEY}" \
-                            -var "private_key_content=${PRIVATE_KEY}"
-                        """
-                    }
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                ]) {
+                    sh '''
+                        docker exec   \
+                            -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                            -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                            jenkins-build sh -c "
+                                cd terraform/03-ecommerce-cluster &&
+                                terraform apply -auto-approve tfplan \
+                                    -var 'public_key_content=${PUBLIC_KEY}' \
+                                    -var 'private_key_content=${PRIVATE_KEY}'
+                            "
+                    '''
                 }
             }
         }
 
         stage('Show Terraform Outputs') {
             steps {
-                dir('terraform/03-ecommerce-cluster') {
-                    echo "Printing Terraform outputs..."
-                    sh "terraform output"
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    sh """
+                        docker exec \
+                        -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        jenkins-build sh -c '
+                            cd terraform/03-ecommerce-cluster &&
+                            terraform output
+                        '
+                    """
                 }
             }
         }
 
-        stage('Show Private IPs') {
+        stage('Cleanup Container') {
             steps {
-                dir('terraform/03-ecommerce-cluster') {
-                    sh "terraform output private_ips"
-                }
+                echo "Stopping and removing temporary container..."
+                sh '''
+                    docker stop jenkins-build
+                    docker rm jenkins-build
+                '''
             }
         }
     }
 
     post {
+        always {
+            cleanWs()
+        }
         success {
             echo "Terraform applied successfully!"
         }
         failure {
             echo "Terraform run failed!"
-        }
-        always {
-            echo "Cleaning up workspace..."
-            cleanWs()
         }
     }
 }
