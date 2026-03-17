@@ -28,7 +28,7 @@ data "terraform_remote_state" "vpc" {
   backend = "s3"
 
   config = {
-    bucket = "e-commerce-sys"
+    bucket = "e-commerce-system-maria"
     key    = "vpc/terraform.tfstate"
     region = "us-east-1"
   }
