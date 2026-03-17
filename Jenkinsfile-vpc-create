@@ -79,9 +79,7 @@ docker exec jenkins-build sh -c "
                             -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
                             jenkins-build sh -c "
                                 cd terraform/01-vpc &&
-                                terraform plan -out=tfplan \
-                                    -var 'public_key_content=${PUBLIC_KEY}' \
-                                    -var 'private_key_content=${PRIVATE_KEY}'
+                                terraform plan -out=tfplan
                             "
                     '''
                 }
@@ -102,9 +100,7 @@ docker exec jenkins-build sh -c "
                             -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
                             jenkins-build sh -c "
                                 cd terraform/01-vpc &&
-                                terraform apply -auto-approve tfplan \
-                                    -var 'public_key_content=${PUBLIC_KEY}' \
-                                    -var 'private_key_content=${PRIVATE_KEY}'
+                                terraform apply -auto-approve tfplan
                             "
                     '''
                 }
