@@ -48,10 +48,18 @@ pipeline {
         stage('Run Ansible Playbook') {
             steps {
                 dir('ansible/') {
+                    echo "Checking files inside container..."
+                    sh '''
+                        docker exec ansible-build sh -c "
+                            ls -R /workspace
+                        "
+                    '''
+
                     echo "Running Ansible playbook..."
                     sh '''
                         docker exec ansible-build sh -c "
-                            ansible-playbook -i production/company/inventory.ini production/company/playbook.yml
+                            ansible-playbook -i /workspace/ansible/production/company/inventory.ini \
+                                            /workspace/ansible/production/company/playbook.yml
                         "
                     '''
                 }
