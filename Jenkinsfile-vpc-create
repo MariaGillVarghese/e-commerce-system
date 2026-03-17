@@ -1,5 +1,10 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'alpine:3.19'
+            args '-u root:root'
+        }
+    }
 
     environment {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
@@ -7,6 +12,25 @@ pipeline {
     }
 
     stages {
+        stage('Install Dependencies') {
+            steps {
+                sh '''
+                    echo "Installing dependencies..."
+                    apk add --no-cache \
+                        git \
+                        bash \
+                        curl \
+                        unzip
+
+                    echo "Installing Terraform..."
+                    curl -LO https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
+                    unzip terraform_1.6.6_linux_amd64.zip
+                    mv terraform /usr/local/bin/
+                    terraform version
+                '''
+            }
+        }
+
         stage('Checkout') {
             steps {
                 echo "Checking out code from GitHub..."
@@ -17,7 +41,6 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('terraform/01-vpc') {
-                    echo "Initializing Terraform..."
                     sh "terraform init"
                 }
             }
@@ -26,16 +49,15 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('terraform/01-vpc') {
-                    echo "Running Terraform plan..."
                     withCredentials([
                         string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
                         string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
                     ]) {
-                        sh """
+                        sh '''
                             terraform plan -out=tfplan \
                             -var "public_key_content=${PUBLIC_KEY}" \
                             -var "private_key_content=${PRIVATE_KEY}"
-                        """
+                        '''
                     }
                 }
             }
@@ -44,16 +66,15 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('terraform/01-vpc') {
-                    echo "Applying Terraform changes..."
                     withCredentials([
                         string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
                         string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
                     ]) {
-                        sh """
+                        sh '''
                             terraform apply -auto-approve tfplan \
                             -var "public_key_content=${PUBLIC_KEY}" \
                             -var "private_key_content=${PRIVATE_KEY}"
-                        """
+                        '''
                     }
                 }
             }
@@ -62,7 +83,6 @@ pipeline {
         stage('Show Terraform Outputs') {
             steps {
                 dir('terraform/01-vpc') {
-                    echo "Printing Terraform outputs..."
                     sh "terraform output"
                 }
             }
@@ -83,6 +103,9 @@ pipeline {
         }
         failure {
             echo "Terraform run failed!"
+        }
+        always {
+            cleanWs()
         }
     }
 }

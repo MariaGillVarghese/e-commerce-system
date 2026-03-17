@@ -5,6 +5,10 @@ pipeline {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
     }
+    
+    options {
+        skipDefaultCheckout()
+    }
 
     stages {
         stage('Checkout') {
@@ -83,6 +87,10 @@ pipeline {
         }
         failure {
             echo "Terraform run failed!"
+        }
+        always {
+            echo "Cleaning up workspace..."
+            cleanWs()
         }
     }
 }
