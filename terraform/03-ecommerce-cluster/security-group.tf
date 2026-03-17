@@ -16,13 +16,13 @@ resource "aws_security_group" "ecommerce" {
   }
 
   # SSH from Jenkins server
-  ingress {
-    description     = "SSH from Jenkins server"
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    security_groups = [var.jenkins_security_group_id]
-  }
+  # ingress {
+  #     description     = "SSH from Jenkins server"
+  #   from_port       = 22
+  #   to_port         = 22
+  #  protocol        = "tcp"
+  #   security_groups = [var.jenkins_security_group_id]
+  # }
 
   # PostgreSQL - between cluster nodes
   ingress {

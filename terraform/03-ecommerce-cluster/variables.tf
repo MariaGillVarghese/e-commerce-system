@@ -22,11 +22,11 @@ variable "developer_ip" {
   default     = "0.0.0.0/0"
 }
 
-variable "jenkins_security_group_id" {
-  description = "Security group ID of the Jenkins server (for SSH access)"
-  type        = string
-  default     = "sg-00dd23f0dd812ed2e"
-}
+# variable "jenkins_security_group_id" {
+#   description = "Security group ID of the Jenkins server (for SSH access)"
+#   type        = string
+#   default     = "sg-00dd23f0dd812ed2e"
+# }
 
 variable "project_name" {
   description = "Project name used for tagging"
