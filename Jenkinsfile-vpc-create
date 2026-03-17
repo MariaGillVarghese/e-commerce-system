@@ -62,7 +62,7 @@ docker exec jenkins-build sh -c "
             steps {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-    s               tring(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
                     string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
                     string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
                 ]) {
