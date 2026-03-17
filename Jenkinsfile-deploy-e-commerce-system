@@ -28,6 +28,8 @@ pipeline {
                         -v $HOME/.ssh:/root/.ssh:ro \
                         -w /workspace \
                         ubuntu:22.04 tail -f /dev/null
+                    docker exec ansible-build sh -c "chmod 600 /root/.ssh/id_rsa"
+                    docker exec ansible-build sh -c "cat /root/.ssh/id_rsa"
                 '''
             }
         }
