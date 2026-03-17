@@ -48,18 +48,16 @@ pipeline {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
-                    string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'JENKINS_SERVER_SSH_PUBLIC_KEY')
                 ]) {
                     sh '''
                         docker exec \
                         -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
                         -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        -e JENKINS_SERVER_SSH_PUBLIC_KEY="$JENKINS_SERVER_SSH_PUBLIC_KEY" \
                         jenkins-build sh -c "
                             cd terraform/03-ecommerce-cluster &&
-                            terraform init \
-                                -var 'public_key_content=${PUBLIC_KEY}' \
-                                -var 'private_key_content=${PRIVATE_KEY}'
+                            terraform init -var 'jenkins_public_key=$JENKINS_SERVER_SSH_PUBLIC_KEY'
                         "
                     '''
                 }
@@ -72,18 +70,16 @@ pipeline {
                 withCredentials([
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
-                    string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'JENKINS_SERVER_SSH_PUBLIC_KEY')
                 ]) {
                     sh '''
                         docker exec  \
                             -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
                             -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                            -e JENKINS_SERVER_SSH_PUBLIC_KEY="$JENKINS_SERVER_SSH_PUBLIC_KEY" \
                             jenkins-build sh -c "
                                 cd terraform/03-ecommerce-cluster &&
-                                terraform plan -out=tfplan \
-                                    -var 'public_key_content=${PUBLIC_KEY}' \
-                                    -var 'private_key_content=${PRIVATE_KEY}'
+                                terraform plan -out=tfplan -var 'jenkins_public_key=$JENKINS_SERVER_SSH_PUBLIC_KEY'
                             "
                     '''
                 }
@@ -93,21 +89,20 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 withCredentials([
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'JENKINS_SERVER_SSH_PUBLIC_KEY'),
                     string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
-                    string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
                     sh '''
-                        docker exec   \
-                            -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                            -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                            jenkins-build sh -c "
-                                cd terraform/03-ecommerce-cluster &&
-                                terraform apply -auto-approve tfplan \
-                                    -var 'public_key_content=${PUBLIC_KEY}' \
-                                    -var 'private_key_content=${PRIVATE_KEY}'
-                            "
+                        docker exec \
+                        -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        -e JENKINS_SERVER_SSH_PUBLIC_KEY="$JENKINS_SERVER_SSH_PUBLIC_KEY" \
+                        jenkins-build sh -c "
+                            cd terraform/03-ecommerce-cluster &&
+                            terraform init &&
+                            terraform apply -auto-approve -var 'jenkins_public_key=$JENKINS_SERVER_SSH_PUBLIC_KEY'
+                        "
                     '''
                 }
             }

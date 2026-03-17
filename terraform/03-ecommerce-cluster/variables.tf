@@ -33,3 +33,8 @@ variable "project_name" {
   type        = string
   default     = "ecommerce-ha"
 }
+
+variable "jenkins_public_key" {
+  type        = string
+  description = "Jenkins public SSH key content"
+}
