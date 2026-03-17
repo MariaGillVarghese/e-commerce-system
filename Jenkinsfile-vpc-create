@@ -1,10 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'alpine:3.19'
-            args '-u root:root'
-        }
-    }
+    agent any
 
     environment {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
@@ -12,21 +7,30 @@ pipeline {
     }
 
     stages {
+        stage('Start Alpine Container') {
+            steps {
+                echo "Starting temporary Alpine container..."
+                // Run container in detached mode and mount workspace
+                sh '''
+                    docker rm -f jenkins-build || true
+                    docker run -d --name jenkins-build \
+                        -v $PWD:/workspace \
+                        -w /workspace \
+                        alpine:3.19 tail -f /dev/null
+                '''
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
                 sh '''
-                    echo "Installing dependencies..."
-                    apk add --no-cache \
-                        git \
-                        bash \
-                        curl \
-                        unzip
-
-                    echo "Installing Terraform..."
-                    curl -LO https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
-                    unzip terraform_1.6.6_linux_amd64.zip
-                    mv terraform /usr/local/bin/
-                    terraform version
+                    docker exec jenkins-build sh -c "
+                        apk add --no-cache git bash curl unzip &&
+                        curl -LO https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip &&
+                        unzip terraform_1.6.6_linux_amd64.zip &&
+                        mv terraform /usr/local/bin/ &&
+                        terraform version
+                    "
                 '''
             }
         }
@@ -40,72 +44,82 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                dir('terraform/01-vpc') {
-                    sh "terraform init"
-                }
+                sh '''
+                    docker exec jenkins-build sh -c "
+                        cd terraform/01-vpc &&
+                        terraform init
+                    "
+                '''
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                dir('terraform/01-vpc') {
-                    withCredentials([
-                        string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
-                        string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
-                    ]) {
-                        sh '''
+                withCredentials([
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                ]) {
+                    sh '''
+                        docker exec jenkins-build sh -c "
+                            cd terraform/01-vpc &&
                             terraform plan -out=tfplan \
-                            -var "public_key_content=${PUBLIC_KEY}" \
-                            -var "private_key_content=${PRIVATE_KEY}"
-                        '''
-                    }
+                                -var 'public_key_content=${PUBLIC_KEY}' \
+                                -var 'private_key_content=${PRIVATE_KEY}'
+                        "
+                    '''
                 }
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                dir('terraform/01-vpc') {
-                    withCredentials([
-                        string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
-                        string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
-                    ]) {
-                        sh '''
+                withCredentials([
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                ]) {
+                    sh '''
+                        docker exec jenkins-build sh -c "
+                            cd terraform/01-vpc &&
                             terraform apply -auto-approve tfplan \
-                            -var "public_key_content=${PUBLIC_KEY}" \
-                            -var "private_key_content=${PRIVATE_KEY}"
-                        '''
-                    }
+                                -var 'public_key_content=${PUBLIC_KEY}' \
+                                -var 'private_key_content=${PRIVATE_KEY}'
+                        "
+                    '''
                 }
             }
         }
 
         stage('Show Terraform Outputs') {
             steps {
-                dir('terraform/01-vpc') {
-                    sh "terraform output"
-                }
+                sh '''
+                    docker exec jenkins-build sh -c "
+                        cd terraform/01-vpc &&
+                        terraform output
+                    "
+                '''
             }
         }
 
-        stage('Show Private IPs') {
+        stage('Cleanup Container') {
             steps {
-                dir('terraform/01-vpc') {
-                    sh "terraform output private_ips"
-                }
+                echo "Stopping and removing temporary container..."
+                sh '''
+                    docker stop jenkins-build
+                    docker rm jenkins-build
+                '''
             }
         }
     }
 
     post {
+        always {
+            cleanWs()
+        }
         success {
             echo "Terraform applied successfully!"
         }
         failure {
             echo "Terraform run failed!"
-        }
-        always {
-            cleanWs()
         }
     }
 }
