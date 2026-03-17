@@ -24,10 +24,10 @@ pipeline {
                 sh '''
                     docker rm -f ansible-build || true
                     docker run -d --name ansible-build \
-                        -v $PWD:/workspace \
-                        -v $HOME/.ssh:/root/.ssh:ro \
-                        -w /workspace \
-                        ubuntu:22.04 tail -f /dev/null
+                    -v /var/lib/jenkins/workspace/setup-e-commerce-system:/workspace \
+                    -v /home/maria/.ssh:/root/.ssh:ro \
+                    -w /workspace \
+                    ubuntu:22.04 tail -f /dev/null
                     docker exec ansible-build sh -c "chmod 600 /root/.ssh/id_rsa"
                     docker exec ansible-build sh -c "cat /root/.ssh/id_rsa"
                 '''
