@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "s3" {
-     bucket         = "e-commerce-sys"
+     bucket         = "e-commerce-system-maria"
      key            = "cluster/terraform.tfstate"
      region         = "us-east-1"
      dynamodb_table = "terraform-lock"
