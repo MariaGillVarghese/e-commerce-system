@@ -43,11 +43,15 @@ docker exec jenkins-build sh -c "
             }
         }
 
-        withCredentials([
-    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY')
-]) {
-    sh '''
+        stage('Terraform Init') {
+            steps {
+                dwithCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'PUBLIC_KEY'),
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PRIVATE_KEY', variable: 'PRIVATE_KEY')
+                ]) {
+                    sh '''
         docker exec \
           -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
           -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
@@ -56,8 +60,11 @@ docker exec jenkins-build sh -c "
               terraform init
           "
     '''
-}
+                }
+            }
+        }
 
+        
         stage('Terraform Plan') {
             steps {
                 withCredentials([
