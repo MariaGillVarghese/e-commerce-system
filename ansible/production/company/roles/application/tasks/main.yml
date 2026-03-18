@@ -17,13 +17,6 @@
     mode: '0755'
   tags: deploy
 
-- name: Fix ownership of project directory
-  file:
-    path: "{{ project_dir }}"
-    recurse: yes
-    owner: ec2-user
-    group: ec2-user
-
 - name: Copy e-commerce microservices source tree
   synchronize:
     src: "{{ playbook_dir }}/../../../microservices"
@@ -31,6 +24,13 @@
     rsync_opts:
       - --exclude=.git
   tags: deploy
+
+- name: Fix ownership of project directory
+  file:
+    path: "{{ project_dir }}"
+    recurse: yes
+    owner: ec2-user
+    group: ec2-user
 
 - name: Build the Maven projects (skip tests)
   command: mvn clean package -DskipTests
