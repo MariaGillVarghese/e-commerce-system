@@ -3,16 +3,6 @@ upstream frontend_cluster {
     server {{ node2_private_ip }}:8080 max_fails=3 fail_timeout=5s;
 }
 
-upstream order_service_cluster {
-    server {{ node1_private_ip }}:8081 max_fails=3 fail_timeout=5s;
-    server {{ node2_private_ip }}:8081 max_fails=3 fail_timeout=5s;
-}
-
-upstream product_service_cluster {
-    server {{ node1_private_ip }}:8082 max_fails=3 fail_timeout=5s;
-    server {{ node2_private_ip }}:8082 max_fails=3 fail_timeout=5s;
-}
-
 # ---------------------------------------------------------
 # Server Configuration
 # ---------------------------------------------------------
@@ -30,20 +20,6 @@ server {
     location /ecommerce {
         proxy_pass http://frontend_cluster;
         proxy_redirect off;
-    }
-
-    location /api/orders {
-        proxy_pass http://order_service_cluster;
-        proxy_redirect off;
-    }
-
-    location /api/products {
-        proxy_pass http://product_service_cluster;
-        proxy_redirect off;
-    }
-
-    location / {
-        proxy_pass http://frontend_cluster;
     }
 
     error_page 502 503 504 /custom_50x.html;
