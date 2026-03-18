@@ -201,6 +201,7 @@
     schema: public
     role: ecommerce_user
   become_user: postgres
+  when: inventory_hostname == groups['postgres_primary'][0]
   tags: database
 
 - name: Grant privileges to application user on order_db tables
@@ -212,4 +213,5 @@
     schema: public
     role: ecommerce_user
   become_user: postgres
+  when: inventory_hostname == groups['postgres_primary'][0]
   tags: database
