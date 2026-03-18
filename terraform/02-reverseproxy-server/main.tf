@@ -43,6 +43,10 @@ data "terraform_remote_state" "cluster" {
   }
 }
 
+# ---------------------------------------------------------
+# AMI Selection
+# ---------------------------------------------------------
+
 data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -53,14 +57,13 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
+# ---------------------------------------------------------
+# SSH Key Management
+# ---------------------------------------------------------
+
 resource "aws_key_pair" "proxy_key" {
   key_name   = "proxy-jenkins-key"
   public_key = var.jenkins_public_key
-}
-
-resource "aws_instance" "reverse_proxy" {
-  # ... other config ...
-  key_name = aws_key_pair.proxy_key.key_name
 }
 
 # ---------------------------------------------------------
@@ -125,7 +128,7 @@ resource "aws_instance" "reverse_proxy" {
   instance_type               = var.instance_type
   subnet_id                   = data.terraform_remote_state.vpc.outputs.public_subnet_id
   vpc_security_group_ids      = [aws_security_group.proxy_sg.id]
-  key_name                    = var.key_name
+  key_name                    = aws_key_pair.proxy_key.key_name
   associate_public_ip_address = true
 
   tags = {
