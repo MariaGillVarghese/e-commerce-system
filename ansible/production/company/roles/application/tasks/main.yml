@@ -167,6 +167,19 @@
   become: yes
   tags: ha
 
+- name: Ensure pip is installed
+  package:
+    name: python3-pip
+    state: present
+  become: yes
+
+- name: Install passlib via pip (system-wide)
+  pip:
+    name: passlib
+    state: present
+    executable: /usr/bin/pip3
+  become: yes
+
 - name: Set hacluster password
   user:
     name: hacluster
