@@ -207,27 +207,31 @@
   tags: ha
 
 # Systemd services managed by Pacemaker
-- name: Add product-service resource (ignore if exists)
+- name: Add product-service resource
   command: pcs resource create product-service systemd:product-service
   become: yes
+  when: inventory_hostname == groups['postgres_primary'][0]
   ignore_errors: yes
   tags: ha
 
-- name: Add order-service resource (ignore if exists)
+- name: Add order-service resource
   command: pcs resource create order-service systemd:order-service
   become: yes
+  when: inventory_hostname == groups['postgres_primary'][0]
   ignore_errors: yes
   tags: ha
 
-- name: Add frontend-service resource (ignore if exists)
+- name: Add frontend-service resource
   command: pcs resource create frontend-service systemd:frontend-service
   become: yes
+  when: inventory_hostname == groups['postgres_primary'][0]
   ignore_errors: yes
   tags: ha
 
-- name: Create Pacemaker resource group for e-commerce services
+- name: Create Pacemaker resource group
   command: pcs resource group add ecommerce-group product-service order-service frontend-service
   become: yes
+  when: inventory_hostname == groups['postgres_primary'][0]
   ignore_errors: yes
 
 - name: Restart product service to pick up DB permissions
@@ -257,6 +261,7 @@
   loop:
     - { db: product_db }
     - { db: order_db }
+  when: inventory_hostname == groups['postgres_primary'][0] # ADD THIS
   tags: database
 
 - name: Set ownership of public schema to ecommerce_user
@@ -285,4 +290,5 @@
   loop:
     - product_db
     - order_db
+  when: inventory_hostname == groups['postgres_primary'][0] # ADD THIS
   tags: database
