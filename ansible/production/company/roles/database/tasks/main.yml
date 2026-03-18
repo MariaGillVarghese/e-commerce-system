@@ -129,7 +129,7 @@
 
 - name: Copy SQL directory to database server
   copy:
-    src: /../sql/
+    src: "{{ playbook_dir }}/../../sql/"
     dest: /tmp/sql/
     owner: postgres
     group: postgres
