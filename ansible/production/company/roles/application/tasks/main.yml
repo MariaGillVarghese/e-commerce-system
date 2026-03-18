@@ -8,6 +8,13 @@
     state: present
   tags: build
 
+- name: Install passlib dependency
+  dnf:
+    name: python3-passlib
+    state: present
+  become: yes
+  tags: ha
+
 - name: Ensure project directory exists
   file:
     path: "{{ project_dir }}"
