@@ -1,0 +1,6 @@
+---
+# This name must match exactly what you wrote in the 'notify' line
+- name: restart nginx
+  systemd:
+    name: nginx
+    state: restarted
