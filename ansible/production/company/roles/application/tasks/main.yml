@@ -17,6 +17,13 @@
     mode: '0755'
   tags: deploy
 
+- name: Fix ownership of project directory
+  file:
+    path: "{{ project_dir }}"
+    recurse: yes
+    owner: ec2-user
+    group: ec2-user
+
 - name: Copy e-commerce microservices source tree
   synchronize:
     src: "{{ playbook_dir }}/../../../microservices"
