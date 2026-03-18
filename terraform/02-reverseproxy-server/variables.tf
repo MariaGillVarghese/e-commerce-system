@@ -27,3 +27,8 @@ variable "project_name" {
   type        = string
   default     = "ecommerce-ha"
 }
+
+variable "jenkins_public_key" {
+  type        = string
+  description = "The public key for the Jenkins server to access the proxy"
+}

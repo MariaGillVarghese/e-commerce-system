@@ -53,6 +53,16 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
+resource "aws_key_pair" "proxy_key" {
+  key_name   = "proxy-jenkins-key"
+  public_key = var.jenkins_public_key
+}
+
+resource "aws_instance" "reverse_proxy" {
+  # ... other config ...
+  key_name = aws_key_pair.proxy_key.key_name
+}
+
 # ---------------------------------------------------------
 # Security Group for Reverse Proxy
 # ---------------------------------------------------------
