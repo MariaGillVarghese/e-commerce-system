@@ -2,5 +2,7 @@
 - name: Provision reverseproxy
   hosts: reverseproxy
   become: true
+  vars:
+    project_dir: /home/ec2-user/e-commerce-system
   roles:
     - reverseproxy

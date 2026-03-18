@@ -1,5 +1,0 @@
-cluster_hosts:
-  - ip: 10.0.1.27
-    host: "{{ groups['ecommerce'][0] }}"
-  - ip: 10.0.1.209
-    host: "{{ groups['ecommerce'][1] }}"

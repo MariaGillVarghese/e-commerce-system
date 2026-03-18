@@ -1,0 +1,35 @@
+upstream frontend_cluster {
+    server {{ node1_private_ip }}:8080 max_fails=3 fail_timeout=5s;
+    server {{ node2_private_ip }}:8080 max_fails=3 fail_timeout=5s;
+}
+
+upstream order_service_cluster {
+    server {{ node1_private_ip }}:8081 max_fails=3 fail_timeout=5s;
+    server {{ node2_private_ip }}:8081 max_fails=3 fail_timeout=5s;
+}
+
+upstream product_service_cluster {
+    server {{ node1_private_ip }}:8082 max_fails=3 fail_timeout=5s;
+    server {{ node2_private_ip }}:8082 max_fails=3 fail_timeout=5s;
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    location / {
+        proxy_pass http://frontend_cluster;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /api/orders {
+        proxy_pass http://order_service_cluster;
+        proxy_set_header Host $host;
+    }
+
+    location /api/products {
+        proxy_pass http://product_service_cluster;
+        proxy_set_header Host $host;
+    }
+}
