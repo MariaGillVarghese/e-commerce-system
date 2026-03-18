@@ -7,5 +7,5 @@
     postgres_user: ec2_user            # PostgreSQL role name (underscore because hyphen not allowed)
     postgres_password: "securepass"  # change this in production or use vault
   roles:
-    - database
+    #- database
     - application
