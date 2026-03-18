@@ -62,8 +62,8 @@ pipeline {
                     echo "Running Ansible playbook..."
                     sh '''
                         docker exec ansible-build sh -c "
-                            ansible-playbook -i /workspace/ansible/production/company/inventory.ini \
-                                            /workspace/ansible/production/company/playbook.yml
+                            ansible-playbook -i /workspace/ansible/e-commerce-system/playbooks/inventory.ini \
+                                            /workspace/ansible/e-commerce-system/playbooks/playbook.yml
                         "
                     '''
                 }

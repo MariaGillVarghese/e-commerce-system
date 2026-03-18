@@ -13,23 +13,42 @@ upstream product_service_cluster {
     server {{ node2_private_ip }}:8082 max_fails=3 fail_timeout=5s;
 }
 
+# ---------------------------------------------------------
+# Server Configuration
+# ---------------------------------------------------------
+
 server {
-    listen 80;
+    listen 80 default_server;
+    listen [::]:80 default_server;
     server_name _;
 
-    location / {
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    location /ecommerce {
         proxy_pass http://frontend_cluster;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        proxy_redirect off;
     }
 
     location /api/orders {
         proxy_pass http://order_service_cluster;
-        proxy_set_header Host $host;
+        proxy_redirect off;
     }
 
     location /api/products {
         proxy_pass http://product_service_cluster;
-        proxy_set_header Host $host;
+        proxy_redirect off;
+    }
+
+    location / {
+        proxy_pass http://frontend_cluster;
+    }
+
+    error_page 502 503 504 /custom_50x.html;
+    location = /custom_50x.html {
+        root /usr/share/nginx/html;
+        internal;
     }
 }
