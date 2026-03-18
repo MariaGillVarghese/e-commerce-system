@@ -10,7 +10,6 @@ pipeline {
         stage('Start Alpine Container') {
             steps {
                 echo "Starting temporary Alpine container..."
-                // Run container in detached mode and mount workspace
                 sh '''
                     docker rm -f jenkins-build || true
                     docker run -d --name jenkins-build \

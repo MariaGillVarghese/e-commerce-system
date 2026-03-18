@@ -261,7 +261,6 @@
   loop:
     - { db: product_db }
     - { db: order_db }
-  when: inventory_hostname == groups['postgres_primary'][0] # ADD THIS
   tags: database
 
 - name: Set ownership of public schema to ecommerce_user
@@ -274,7 +273,6 @@
   loop:
     - product_db
     - order_db
-  when: inventory_hostname == groups['postgres_primary'][0]
   tags: database
 
 - name: Grant privileges on sequences to ecommerce_user
@@ -290,5 +288,4 @@
   loop:
     - product_db
     - order_db
-  when: inventory_hostname == groups['postgres_primary'][0] # ADD THIS
   tags: database
