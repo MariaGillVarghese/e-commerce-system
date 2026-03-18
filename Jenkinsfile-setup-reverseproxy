@@ -4,93 +4,108 @@ pipeline {
     environment {
         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
-    }
-    
-    options {
-        skipDefaultCheckout()
+        PROJECT_DIR           = 'terraform/02-reverseproxy-server'
     }
 
     stages {
+        stage('Start Alpine Container') {
+            steps {
+                sh '''
+                    docker rm -f jenkins-proxy-build || true
+                    docker run -d --name jenkins-proxy-build \
+                        -v $PWD:/workspace \
+                        -w /workspace \
+                        alpine:3.19 tail -f /dev/null
+                '''
+            }
+        }
+
+        stage('Install Terraform') {
+            steps {
+                sh '''
+                docker exec jenkins-proxy-build sh -c "
+                    apk add --no-cache git bash curl unzip &&
+                    cd /tmp &&
+                    curl -LO https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip &&
+                    unzip -o terraform_1.6.6_linux_amd64.zip &&
+                    mv terraform /usr/local/bin/
+                "
+                '''
+            }
+        }
+
         stage('Checkout') {
             steps {
-                echo "Checking out code from GitHub..."
                 checkout scm
             }
         }
 
-        stage('Start Ansible Container') {
+        stage('Terraform Init') {
             steps {
-                echo "Starting temporary container for Ansible..."
-                sh '''
-                    docker rm -f ansible-build || true
-                    docker run -d --name ansible-build \
-                    -v /var/lib/jenkins/workspace/setup-e-commerce-system:/workspace \
-                    -v /home/maria/.ssh:/root/.ssh:ro \
-                    -w /workspace \
-                    ubuntu:22.04 tail -f /dev/null
-                    docker exec ansible-build sh -c "ls /root/.ssh/"
-                    docker exec ansible-build sh -c "cat /root/.ssh/id_rsa"
-                '''
+                withCredentials([
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'JENKINS_PUB_KEY')
+                ]) {
+                    sh """
+                        docker exec \
+                        -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        jenkins-proxy-build sh -c "
+                            cd ${PROJECT_DIR} &&
+                            terraform init
+                        "
+                    """
+                }
             }
         }
 
-        stage('Install Ansible & Dependencies') {
+        stage('Terraform Plan') {
             steps {
-                sh '''
-                    docker exec ansible-build sh -c "
-                        apt-get update && \
-                        DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip sshpass git rsync && \
-                        pip3 install --upgrade pip && \
-                        pip3 install ansible && \
-                        pip3 install passlib
-
-                    "
-                '''
+                withCredentials([
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'JENKINS_PUB_KEY')
+                ]) {
+                    sh """
+                        docker exec \
+                        -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        -e JENKINS_PUB_KEY='${JENKINS_PUB_KEY}' \
+                        jenkins-proxy-build sh -c "
+                            cd ${PROJECT_DIR} &&
+                            terraform plan -out=tfplan -var 'jenkins_public_key=\$JENKINS_PUB_KEY'
+                        "
+                    """
+                }
             }
         }
 
-        stage('Run Ansible Playbook') {
+        stage('Terraform Apply') {
             steps {
-                dir('ansible/') {
-                    echo "Checking files inside container..."
-                    sh '''
-                        docker exec ansible-build sh -c "
-                            ls -R /workspace
+                withCredentials([
+                    string(credentialsId: 'JENKINS_SERVER_SSH_PUBLIC_KEY', variable: 'JENKINS_PUB_KEY')
+                ]) {
+                    sh """
+                        docker exec \
+                        -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        -e JENKINS_PUB_KEY='${JENKINS_PUB_KEY}' \
+                        jenkins-proxy-build sh -c "
+                            cd ${PROJECT_DIR} &&
+                            terraform apply -auto-approve tfplan
                         "
-                    '''
-
-                    echo "Running Ansible playbook..."
-                    sh '''
-                        docker exec ansible-build sh -c "
-                            ansible-playbook -i /workspace/ansible/production/company/inventory.ini \
-                                            /workspace/ansible/production/company/playbook.yml
-                        "
-                    '''
+                    """
                 }
             }
         }
 
         stage('Cleanup Container') {
             steps {
-                echo "Stopping and removing temporary container..."
-                sh '''
-                    docker stop ansible-build
-                    docker rm ansible-build
-                '''
+                sh 'docker rm -f jenkins-proxy-build || true'
             }
         }
     }
 
     post {
         always {
-            echo "Cleaning up workspace..."
             cleanWs()
-        }
-        success {
-            echo "DB and E-Commerce-System deployed successfully!"
-        }
-        failure {
-            echo "Deployment failed!"
         }
     }
 }

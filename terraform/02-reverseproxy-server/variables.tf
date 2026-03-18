@@ -5,19 +5,19 @@ variable "aws_region" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type for Jenkins server"
+  description = "EC2 instance type for the reverse proxy"
   type        = string
   default     = "t3.small"
 }
 
 variable "key_name" {
-  description = "Name of the SSH key pair"
+  description = "Name of the SSH key pair (must exist in AWS)"
   type        = string
-  default     = "e-commerce-key-pair"
+  default     = "jenkins-key"
 }
 
 variable "developer_ip" {
-  description = "Developer public IP for SSH access (CIDR format, e.g. 1.2.3.4/32). Use 0.0.0.0/0 for development."
+  description = "Developer public IP for SSH access (CIDR format)"
   type        = string
   default     = "0.0.0.0/0"
 }
