@@ -39,7 +39,7 @@ pipeline {
                 sh '''
                     docker exec ansible-build sh -c "
                         apt-get update && \
-                        DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip sshpass git && \
+                        DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip sshpass git rsync && \
                         pip3 install --upgrade pip && \
                         pip3 install ansible
                     "
